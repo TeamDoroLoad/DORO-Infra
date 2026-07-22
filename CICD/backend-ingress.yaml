@@ -1,0 +1,36 @@
+# backend-ingress.yaml
+# CloudFront가 오리진으로 바라볼 Public ALB를 프로비저닝하는 Ingress.
+# 자체 설치(Helm) AWS Load Balancer Controller(kube-system)가 이 리소스를 보고 ALB를 생성한다.
+# scheme/subnet은 (Auto Mode의 IngressClassParams 대신) 이 Ingress의 annotation으로 직접 선언한다.
+# 구조: Client → CloudFront(퍼블릭, HTTPS 종료) → ALB(본 Ingress, Custom Origin) → backend-service.yaml → Pod:8080
+# VPC Origin은 사용하지 않는다 — ALB DNS 이름을 CloudFront의 일반 Custom Origin으로 등록하고,
+# ALB 보안그룹에는 CloudFront 관리형 프리픽스 리스트(com.amazonaws.global.cloudfront.origin-facing)만
+# 인바운드로 허용해 CloudFront를 우회한 직접 접근을 차단한다.
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: doro-app-ingress
+  namespace: default
+  labels:
+    app: doro-app
+    project: doro-load
+    team: team-a
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing            # Public ALB — CloudFront Custom Origin은 인터넷에서 도달 가능해야 함
+    alb.ingress.kubernetes.io/subnets: subnet-05d2f0c9b6c2cd5ec,subnet-034c5c3b44fc22b46  # team2-doro-subnet-public-a/c
+    alb.ingress.kubernetes.io/target-type: ip                  # Pod IP로 직접 라우팅 (awsVpcCNI 전제)
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'   # CloudFront ↔ ALB 구간은 HTTP만 사용 (HTTPS 종료는 CloudFront가 전담)
+    alb.ingress.kubernetes.io/healthcheck-path: /actuator/health/readiness
+spec:
+  ingressClassName: alb   # ingressclass.yaml의 IngressClass(controller: ingress.k8s.aws/alb)를 가리킴
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: doro-app-service   # backend-service.yaml의 metadata.name과 일치
+            port:
+              number: 8080

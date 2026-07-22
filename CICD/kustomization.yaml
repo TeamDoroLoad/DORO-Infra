@@ -1,0 +1,20 @@
+# kustomization.yaml
+# DORO Load 백엔드 K8s 리소스를 한 번에 적용하기 위한 진입점.
+#   kubectl apply -k CICD/
+# 이후 이미지 갱신은 kustomize가 아니라 CI가 직접 실행한다 (아래 backend-deployment.yaml 상단 주석 참고):
+#   kubectl set image deployment/doro-app doro-app=<ECR_REGISTRY>/team2/doroload:<git-sha> -n default
+#
+# *** 사전 준비 ***
+# secret.yaml은 실제 값이 들어가야 해서 .gitignore 대상이라 새로 clone하면 존재하지 않는다.
+# secret.example.yaml을 secret.yaml로 복사하고 값을 채운 뒤에 apply -k를 실행해야 한다.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - secret.yaml
+  - redis-deployment.yaml
+  - redis-service.yaml
+  - backend-deployment.yaml
+  - backend-service.yaml
+  - ingressclass.yaml
+  - backend-ingress.yaml

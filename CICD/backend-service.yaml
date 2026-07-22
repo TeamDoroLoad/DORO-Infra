@@ -1,0 +1,25 @@
+# backend-service.yaml
+# doro-app Deployment를 클러스터 내부에 노출하는 Service.
+# 구조: Client → CloudFront(퍼블릭, HTTPS 종료) → ALB(backend-ingress.yaml, Custom Origin) → 본 Service → Pod:8080
+# VPC Origin은 사용하지 않는다 — ALB를 CloudFront의 일반 Custom Origin으로 등록한다.
+# ALB Target Group은 target-type: ip로 Pod IP를 직접 타겟팅하지만, Ingress 스펙상 backend Service 참조는
+# 필수이므로 ClusterIP로 유지한다 (과거 NLB를 직접 프로비저닝하던 LoadBalancer 타입/어노테이션은 제거).
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: doro-app-service        # backend-ingress.yaml의 backend.service.name과 일치해야 함
+  namespace: default
+  labels:
+    app: doro-app
+    project: doro-load
+    team: team-a
+spec:
+  type: ClusterIP
+  selector:
+    app: doro-app                # backend-deployment.yaml의 template.metadata.labels.app과 일치해야 트래픽 전달됨
+  ports:
+  - name: http
+    port: 8080                   # backend-ingress.yaml의 backend.service.port와 일치
+    targetPort: 8080              # 실제 전달할 Pod 컨테이너 포트
+    protocol: TCP

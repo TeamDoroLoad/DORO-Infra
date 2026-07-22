@@ -1,0 +1,46 @@
+# --- Secrets (실제 값이 들어가는 파일, *.example.yaml만 커밋) ---
+secret.yaml
+CICD/secret.yaml
+secret-store.yaml
+external-secret.yaml
+*.secret.yaml
+*-secret.yaml
+!*secret.example.yaml
+
+# --- 환경 변수 / 자격 증명 ---
+.env
+.env.*
+!.env.example
+*_accessKeys.csv
+*.pem
+*.key
+*.crt
+*.p12
+
+# --- kubeconfig ---
+kubeconfig
+*.kubeconfig
+
+# --- Terraform ---
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform/
+.terraform.lock.hcl
+
+# --- Helm ---
+charts/*.tgz
+
+# --- kustomize 빌드 산출물 ---
+*-rendered.yaml
+build/
+
+# --- OS / 편집기 ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- 로그 ---
+*.log

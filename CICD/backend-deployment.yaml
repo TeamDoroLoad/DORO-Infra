@@ -1,0 +1,117 @@
+# backend-deployment.yaml
+# Private Application Layer에 배치되는 Spring Boot Web Service Deployment. DORO-Infra/deploy_aws.yaml 기반.
+# Web API + Scheduler가 동일 애플리케이션에서 동작한다. replica는 1개로 고정.
+#
+# *** 이미지 교체 (CI 연동) ***
+# image는 직접 채우지 않는다 — .github/workflows/deloy.yaml의 deploy-backend job이
+#   docker build -t $ECR_REGISTRY/team2/doroload:$IMAGE_TAG .   (IMAGE_TAG = github.sha)
+# 로 ECR에 push한 뒤, 배포 job에서 아래 명령으로 이 값을 주입한다:
+#   kubectl set image deployment/doro-app doro-app=$ECR_REGISTRY/team2/doroload:$IMAGE_TAG -n default
+#
+# *** DORO-Infra/deploy_aws.yaml 대비 수정한 부분 ***
+# REDIS_PASSWORD → SPRING_DATA_REDIS_PASSWORD로 env 이름을 바꿨다. application-aws.yml은
+# spring.data.redis.password를 ${...}로 참조하지 않으므로, 원본처럼 임의 이름(REDIS_PASSWORD)으로 주입하면
+# Spring Boot가 값을 읽지 못해 redis-deployment.yaml이 걸어둔 --requirepass 인증에 실패한다
+# (모든 Redis 호출이 NOAUTH 에러). SPRING_DATA_REDIS_PASSWORD는 Spring Boot의 relaxed binding으로
+# spring.data.redis.password에 자동 매핑되므로 application-aws.yml 수정 없이 바로 동작한다.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: doro-app
+  namespace: default
+  labels:
+    app: doro-app                 # Service selector가 매칭하는 라벨
+    project: doro-load
+    team: team-a
+spec:
+  replicas: 1                     # 요청에 따라 단일 Pod로 고정 (다중화 필요 시 증설)
+  selector:
+    matchLabels:
+      app: doro-app                # 아래 template.metadata.labels와 반드시 일치해야 함
+  template:
+    metadata:
+      labels:
+        app: doro-app              # Service(doro-app-service)가 이 라벨을 보고 트래픽을 전달
+        project: doro-load
+        team: team-a
+    spec:
+      automountServiceAccountToken: false   # 불필요한 K8s API 접근 차단
+      # imagePullSecrets 불필요: AWS ECR 사용 — EKS 노드 IAM 역할(또는 IRSA)에
+      # AmazonEC2ContainerRegistryReadOnly(또는 동등 커스텀 정책) 권한만 있으면 pull 가능
+      containers:
+      - name: doro-app
+        image: IMAGE_PLACEHOLDER   # 직접 채우지 않음 — CI가 배포 시 kubectl set image로 실제 ECR 이미지로 치환
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        securityContext:
+          allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 40
+          periodSeconds: 20
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          failureThreshold: 3
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "aws"                       # DORO-BACK엔 application-prod.yml이 없고 application-aws.yml만 있음
+
+        # --- MySQL (AWS RDS 사용 확정 / doro-sg-rds, 3306) ---
+        - name: DB_URL
+          value: "jdbc:mysql://team2-doroload-mysql.cnqmcq6uwqa3.ap-northeast-2.rds.amazonaws.com:3306/doro?serverTimezone=UTC&characterEncoding=UTF-8"
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: doro-secret
+              key: mysql-username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: doro-secret
+              key: mysql-password
+
+        # --- Redis (doro-redis-service, redis-deployment.yaml) ---
+        - name: REDIS_HOST
+          value: "doro-redis-service"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: SPRING_DATA_REDIS_PASSWORD   # 수정: 원본은 REDIS_PASSWORD였으나 Spring이 읽지 못하는 이름이었음 (위 상단 주석 참고)
+          valueFrom:
+            secretKeyRef:
+              name: doro-secret
+              key: redis-password
+
+        # --- CORS 허용 Origin (application-aws.yml의 doro.cors.allowed-origins) ---
+        - name: WEB_ORIGIN
+          value: "https://doro.beam0331.click"
+
+        # --- 외부 데이터 API ---
+        - name: PUBLIC_DATA_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: doro-secret
+              key: public-data-api-key
+        - name: TMAP_APP_KEY
+          valueFrom:
+            secretKeyRef:
+              name: doro-secret
+              key: tmap-app-key
