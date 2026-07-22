@@ -1,8 +1,9 @@
 # --- Secrets (실제 값이 들어가는 파일, *.example.yaml만 커밋) ---
+# secret.yaml: 로컬(docker-desktop) 테스트용 수동 경로. 운영 클러스터는 AWS Secrets Manager +
+# Secrets Store CSI Driver(CICD/secret-provider-class.yaml, 실제 값 없음, 커밋 대상)로 doro-secret을
+# 자동 생성하므로 이 파일 자체를 만들 필요가 없다.
 secret.yaml
 CICD/secret.yaml
-secret-store.yaml
-external-secret.yaml
 *.secret.yaml
 *-secret.yaml
 !*secret.example.yaml
