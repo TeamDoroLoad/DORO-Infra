@@ -48,7 +48,7 @@ spec:
       # AmazonEC2ContainerRegistryReadOnly(또는 동등 커스텀 정책) 권한만 있으면 pull 가능
       containers:
       - name: doro-app
-        image: 727646470302.dkr.ecr.ap-northeast-2.amazonaws.com/team2/doroload:0.0.1
+        image: IMAGE_REPO_PLACEHOLDER   # .github/workflows/service_deploy.yaml에서 kubectl set image로 교체됨
         ports:
         - containerPort: 8080
           name: http
@@ -84,7 +84,7 @@ spec:
 
         # --- MySQL (AWS RDS 사용 확정 / doro-sg-rds, 3306) ---
         - name: DB_URL
-          value: "jdbc:mysql://team2-doroload-mysql.cnqmcq6uwqa3.ap-northeast-2.rds.amazonaws.com:3306/doro?serverTimezone=UTC&characterEncoding=UTF-8"
+          value: "jdbc:mysql://team2-doroload-mysql.cnqmcq6uwqa3.ap-northeast-2.rds.amazonaws.com:3306/doroload?serverTimezone=UTC&characterEncoding=UTF-8"
         - name: DB_USERNAME
           valueFrom:
             secretKeyRef:
