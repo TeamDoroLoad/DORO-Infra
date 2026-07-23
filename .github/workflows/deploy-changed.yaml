@@ -91,7 +91,7 @@ jobs:
         run: |
           # kustomization.yaml에 정의된 리소스 순서(SA/SecretProviderClass가 Deployment보다 먼저,
           # IngressClass가 Ingress보다 먼저 존재해야 함)를 그대로 따른다.
-          ORDERED_FILES="CICD/serviceaccount.yaml CICD/secret-provider-class.yaml CICD/backend-deployment.yaml CICD/backend-service.yaml CICD/ingressclass.yaml CICD/backend-ingress.yaml"
+          ORDERED_FILES="CICD/serviceaccount.yaml CICD/secret-provider-class.yaml CICD/backend-deployment.yaml CICD/backend-service.yaml CICD/ingressclass.yaml CICD/backend-ingress.yaml CICD/backend-pdb.yaml"
           CHANGED_FILES="${{ steps.diff.outputs.files }}"
 
           for f in $ORDERED_FILES; do

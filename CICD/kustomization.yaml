@@ -21,3 +21,4 @@ resources:
   - backend-service.yaml
   - ingressclass.yaml
   - backend-ingress.yaml
+  - backend-pdb.yaml

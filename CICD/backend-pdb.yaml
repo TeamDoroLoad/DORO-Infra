@@ -1,0 +1,21 @@
+# backend-pdb.yaml
+# doro-app이 항상 최소 1개는 Ready 상태로 남아있도록 강제하는 PodDisruptionBudget.
+#
+# Karpenter는 어떤 노드를 통합(consolidation)하려 할 때, 그 노드에 있는 Pod 중 하나라도
+# 이 PDB를 위반하게 되면(evict 시 available Pod 수가 minAvailable 미만이 되면) 그 Pod뿐 아니라
+# 노드 전체를 통합 대상에서 제외한다. backend-deployment.yaml의 topologySpreadConstraints로
+# 두 Pod를 서로 다른 노드에 분산시켜둔 상태와 짝을 이뤄, "노드 통합으로 두 Pod가 동시에
+# evict되어 응답 가능한 Pod가 0개가 되는" 상황(2026-07-23 실제 발생) 자체를 막는다.
+#
+# 하드웨어 장애 등 강제 종료(involuntary disruption)에는 효과가 없다 — Karpenter/kubectl drain
+# 같은 자발적 축출(voluntary disruption)에만 적용되는 안전장치다.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: doro-app-pdb
+  namespace: default
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: doro-app
