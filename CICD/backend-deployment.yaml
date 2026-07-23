@@ -1,6 +1,16 @@
 # backend-deployment.yaml
 # Private Application Layer에 배치되는 Spring Boot Web Service Deployment. DORO-Infra/deploy_aws.yaml 기반.
-# Web API + Scheduler가 동일 애플리케이션에서 동작한다. replica는 1개로 고정.
+# Web API + Scheduler가 동일 애플리케이션에서 동작한다.
+#
+# *** replica 2개로 증설 (2026-07-23) ***
+# 기존 1개 고정 구성은, Karpenter가 비용 절감을 위해 노드를 통합(consolidation)하며 이 Pod가 떠
+# 있던 노드를 evict할 때마다 새 Pod가 재기동(이미지 pull + Spring Boot 기동 + readiness probe
+# 통과)하는 60~90초 동안 정상 응답 가능한 Pod가 0개가 되어 그 사이 들어온 요청이 전부 실패하는
+# 문제가 있었다. replica 2개는 두 Pod가 서로 다른 시점/노드에서 죽지 않는 한 최소 1개는 계속
+# 응답 가능하다는 전제인데, 이 매니페스트만으로는 Pod가 서로 다른 노드에 분산 배치되는 걸
+# 보장하지 않는다(스케줄러가 리소스 상황에 따라 알아서 판단) — 두 Pod가 우연히 같은 노드에
+# 몰리면 이번에 겪은 문제가 그대로 재현될 수 있다. 완전히 막으려면 podAntiAffinity 또는
+# topologySpreadConstraints, 그리고 PodDisruptionBudget(minAvailable: 1) 추가가 필요하다.
 #
 # *** 이미지 교체 (CI 연동) ***
 # image는 직접 채우지 않는다 — DORO-Service 저장소의 .github/workflows/service_deloy.yaml에서
@@ -31,7 +41,7 @@ metadata:
     project: doro-load
     team: team-a
 spec:
-  replicas: 1                     # 요청에 따라 단일 Pod로 고정 (다중화 필요 시 증설)
+  replicas: 2                     # 2026-07-23: Karpenter 노드 통합 시 짧은 다운타임 방지를 위해 1 -> 2로 증설
   selector:
     matchLabels:
       app: doro-app                # 아래 template.metadata.labels와 반드시 일치해야 함
