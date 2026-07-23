@@ -58,12 +58,14 @@ spec:
           seccompProfile:
             type: RuntimeDefault
         resources:
+          # 2026-07-23: 기동 시점 메모리 스파이크(Hibernate 메타모델 빌드 등)로 인한 OOMKilled 대응.
+          # idle 시 실사용량은 약 427Mi — limit은 기동 스파이크를 흡수할 여유를 둔 값.
           requests:
-            memory: "1Gi"
-            cpu: "200m"
-          limits:
-            memory: "1Gi"
+            memory: "1.5Gi"
             cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
         livenessProbe:
           httpGet:
             path: /actuator/health/liveness
