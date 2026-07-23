@@ -56,6 +56,17 @@ spec:
       automountServiceAccountToken: false   # 불필요한 K8s API 접근 차단 (IRSA 웹 아이덴티티 토큰과는 별개 메커니즘)
       # imagePullSecrets 불필요: AWS ECR 사용 — EKS 노드 IAM 역할(또는 IRSA)에
       # AmazonEC2ContainerRegistryReadOnly(또는 동등 커스텀 정책) 권한만 있으면 pull 가능
+      # 2026-07-23: replica 2개를 서로 다른 노드에 강제 분산 — 노드 단위 제약은 Karpenter가
+      # 부족하면 새 노드를 붙여서 해소하므로(AZ 단위와 달리 "영원히 Pending"이 되지 않음)
+      # DoNotSchedule(강제)로도 안전하다. backend-pdb.yaml과 짝을 이뤄, Karpenter가 노드를
+      # 통합(consolidation)할 때 두 Pod가 한꺼번에 죽는 것을 막는다.
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: doro-app
       containers:
       - name: doro-app
         image: IMAGE_REPO_PLACEHOLDER   # .github/workflows/service_deploy.yaml에서 kubectl set image로 교체됨
