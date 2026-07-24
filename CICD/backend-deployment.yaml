@@ -22,8 +22,15 @@
 # doro-redis Deployment/Service(자체 운영 Redis 컨테이너)는 더 이상 쓰지 않는다 — AWS가 관리하는
 # ElastiCache 인스턴스로 교체됐고, 해당 인스턴스는 AUTH(비밀번호) 없이 접근 가능하므로
 # SPRING_DATA_REDIS_PASSWORD env 자체가 필요 없다. REDIS_HOST/REDIS_PORT는 하드코딩 대신
-# doro-secret(redis-host/redis-port 키)에서 주입한다 — ElastiCache 엔드포인트가 바뀌어도
+# doro-secret(REDIS_HOST/REDIS_PORT 키)에서 주입한다 — ElastiCache 엔드포인트가 바뀌어도
 # 이 매니페스트를 다시 배포할 필요 없이 AWS Secrets Manager 값만 갱신하면 되도록 하기 위함.
+#
+# *** DB_URL 동적 조합 (2026-07-24) ***
+# RDS 엔드포인트도 Redis와 동일한 이유로 하드코딩을 없앴다 — RDS_HOST/RDS_PORT/RDS_DBNAME을
+# doro-secret에서 각각 주입받고, DB_URL은 Kubernetes의 "dependent environment variables"
+# 기능($(VAR) 치환)으로 조합한다. 이 치환은 같은 env 목록에서 참조 변수가 "먼저" 선언돼 있어야
+# 동작하므로 RDS_HOST/RDS_PORT/RDS_DBNAME이 반드시 DB_URL보다 앞에 와야 한다 — 순서가 바뀌면
+# 에러 없이 리터럴 문자열 "$(RDS_HOST)"가 그대로 값에 들어가 조용히 잘못된 연결 문자열이 된다.
 #
 # *** doro-secret 출처: AWS Secrets Manager (Secrets Store CSI Driver) ***
 # doro-secret은 더 이상 secret.yaml을 수동 apply해서 만들지 않는다. serviceaccount.yaml(IRSA) +
@@ -108,30 +115,46 @@ spec:
           value: "aws"                       # DORO-BACK엔 application-prod.yml이 없고 application-aws.yml만 있음
 
         # --- MySQL (AWS RDS 사용 확정 / doro-sg-rds, 3306) ---
+        # RDS_HOST/RDS_PORT/RDS_DBNAME는 DB_URL이 $(VAR)로 참조하므로 반드시 DB_URL보다 먼저 선언
+        - name: RDS_HOST
+          valueFrom:
+            secretKeyRef:
+              name: doro-secret
+              key: RDS_HOST
+        - name: RDS_PORT
+          valueFrom:
+            secretKeyRef:
+              name: doro-secret
+              key: RDS_PORT
+        - name: RDS_DBNAME
+          valueFrom:
+            secretKeyRef:
+              name: doro-secret
+              key: RDS_DBNAME
         - name: DB_URL
-          value: "jdbc:mysql://team2-doroload-mysql.cnqmcq6uwqa3.ap-northeast-2.rds.amazonaws.com:3306/doroload?serverTimezone=UTC&characterEncoding=UTF-8"
+          value: "jdbc:mysql://$(RDS_HOST):$(RDS_PORT)/$(RDS_DBNAME)?serverTimezone=UTC&characterEncoding=UTF-8"
         - name: DB_USERNAME
           valueFrom:
             secretKeyRef:
               name: doro-secret
-              key: mysql-username
+              key: DB_USERNAME
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
               name: doro-secret
-              key: mysql-password
+              key: DB_PASSWORD
 
         # --- Redis (AWS ElastiCache, AUTH 미사용 — 위 상단 주석 참고) ---
         - name: REDIS_HOST
           valueFrom:
             secretKeyRef:
               name: doro-secret
-              key: redis-host
+              key: REDIS_HOST
         - name: REDIS_PORT
           valueFrom:
             secretKeyRef:
               name: doro-secret
-              key: redis-port
+              key: REDIS_PORT
 
         # --- CORS 허용 Origin (application-aws.yml의 doro.cors.allowed-origins) ---
         - name: WEB_ORIGIN
@@ -142,12 +165,12 @@ spec:
           valueFrom:
             secretKeyRef:
               name: doro-secret
-              key: public-data-api-key
+              key: PUBLIC_DATA_API_KEY
         - name: TMAP_APP_KEY
           valueFrom:
             secretKeyRef:
               name: doro-secret
-              key: tmap-app-key
+              key: TMAP_APP_KEY
         volumeMounts:
         - name: secrets-store-inline
           mountPath: "/mnt/secrets-store"
